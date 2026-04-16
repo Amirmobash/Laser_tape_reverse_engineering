@@ -111,3 +111,5 @@ void loop() {
 - [Habr.com article (Russian, with English translation available)](https://habr.com/en/post/354512/)
 
 ## License
+Amir Mobasheraghdam
+MIT
