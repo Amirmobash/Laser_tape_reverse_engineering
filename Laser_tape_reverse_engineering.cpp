@@ -1,190 +1,224 @@
 #include <LiquidCrystal_I2C.h>
 
-const int IR_SENSOR_IN = 2;
-const int IR_SENSOR_OUT = 3;
+const byte ENTRY_SENSOR_PIN = 2;
+const byte EXIT_SENSOR_PIN = 3;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int personCount = 0;
-int totalIn = 0;
-int totalOut = 0;
+int currentPeople = 0;
+int totalEntries = 0;
+int totalExits = 0;
 
-const unsigned long DEBOUNCE_DELAY = 200;
-const unsigned long SEQUENCE_TIMEOUT = 500;
+const int MAX_PEOPLE = 999;
+const unsigned long DEBOUNCE_TIME = 200;
+const unsigned long SENSOR_TIMEOUT = 500;
+const unsigned long DISPLAY_INTERVAL = 500;
 
-enum SensorState {
-  IDLE,
-  IN_TRIGGERED,
-  OUT_TRIGGERED
+enum CounterState {
+  WAITING,
+  ENTRY_DETECTED,
+  EXIT_DETECTED
 };
 
-SensorState currentState = IDLE;
-unsigned long lastTriggerTime = 0;
-unsigned long lastDisplayUpdate = 0;
+CounterState counterState = WAITING;
 
-bool lastInState = HIGH;
-bool lastOutState = HIGH;
+bool lastEntryState = HIGH;
+bool lastExitState = HIGH;
+
+unsigned long lastSensorTime = 0;
+unsigned long lastDisplayTime = 0;
 
 void setup() {
   Serial.begin(9600);
-  
+
+  pinMode(ENTRY_SENSOR_PIN, INPUT_PULLUP);
+  pinMode(EXIT_SENSOR_PIN, INPUT_PULLUP);
+
   lcd.init();
   lcd.backlight();
-  
-  pinMode(IR_SENSOR_IN, INPUT_PULLUP);
-  pinMode(IR_SENSOR_OUT, INPUT_PULLUP);
-  
+
+  showStartupScreen();
   updateDisplay();
-  
-  delay(1000);
-  Serial.println("System gestartet - Personenzahler bereit");
+
+  Serial.println("People counter is ready");
+  Serial.println("Send R to reset counters");
+  Serial.println("Send S to show current status");
 }
 
 void loop() {
-  bool inState = digitalRead(IR_SENSOR_IN);
-  bool outState = digitalRead(IR_SENSOR_OUT);
-  
-  bool inFalling = (lastInState == HIGH && inState == LOW);
-  bool outFalling = (lastOutState == HIGH && outState == LOW);
-  
-  switch(currentState) {
-    case IDLE:
-      if (inFalling) {
-        currentState = IN_TRIGGERED;
-        lastTriggerTime = millis();
-      }
-      else if (outFalling) {
-        currentState = OUT_TRIGGERED;
-        lastTriggerTime = millis();
-      }
-      break;
-      
-    case IN_TRIGGERED:
-      if (outFalling && (millis() - lastTriggerTime) < SEQUENCE_TIMEOUT) {
-        personIncrement();
-        currentState = IDLE;
-        delay(DEBOUNCE_DELAY);
-      }
-      else if (millis() - lastTriggerTime >= SEQUENCE_TIMEOUT) {
-        currentState = IDLE;
-      }
-      break;
-      
-    case OUT_TRIGGERED:
-      if (inFalling && (millis() - lastTriggerTime) < SEQUENCE_TIMEOUT) {
-        personDecrement();
-        currentState = IDLE;
-        delay(DEBOUNCE_DELAY);
-      }
-      else if (millis() - lastTriggerTime >= SEQUENCE_TIMEOUT) {
-        currentState = IDLE;
-      }
-      break;
-  }
-  
-  if ((millis() - lastDisplayUpdate) >= 500) {
-    updateDisplay();
-    lastDisplayUpdate = millis();
-  }
-  
-  lastInState = inState;
-  lastOutState = outState;
-  
-  processSerialCommands();
-  
+  readSensors();
+  updateDisplayIfNeeded();
+  handleSerialInput();
+
   delay(10);
 }
 
-void personIncrement() {
-  if (personCount < 999) {
-    personCount++;
-    totalIn++;
-    
-    Serial.print("[EINTRITT] Person betritt Raum - Aktuell: ");
-    Serial.print(personCount);
-    Serial.print(" (IN: ");
-    Serial.print(totalIn);
-    Serial.print(", OUT: ");
-    Serial.print(totalOut);
-    Serial.println(")");
+void readSensors() {
+  bool entryState = digitalRead(ENTRY_SENSOR_PIN);
+  bool exitState = digitalRead(EXIT_SENSOR_PIN);
+
+  bool entryTriggered = lastEntryState == HIGH && entryState == LOW;
+  bool exitTriggered = lastExitState == HIGH && exitState == LOW;
+
+  switch (counterState) {
+    case WAITING:
+      if (entryTriggered) {
+        counterState = ENTRY_DETECTED;
+        lastSensorTime = millis();
+      } else if (exitTriggered) {
+        counterState = EXIT_DETECTED;
+        lastSensorTime = millis();
+      }
+      break;
+
+    case ENTRY_DETECTED:
+      if (exitTriggered && isWithinSensorTime()) {
+        addPerson();
+        resetSensorState();
+      } else if (hasSensorTimedOut()) {
+        resetSensorState();
+      }
+      break;
+
+    case EXIT_DETECTED:
+      if (entryTriggered && isWithinSensorTime()) {
+        removePerson();
+        resetSensorState();
+      } else if (hasSensorTimedOut()) {
+        resetSensorState();
+      }
+      break;
+  }
+
+  lastEntryState = entryState;
+  lastExitState = exitState;
+}
+
+bool isWithinSensorTime() {
+  return millis() - lastSensorTime < SENSOR_TIMEOUT;
+}
+
+bool hasSensorTimedOut() {
+  return millis() - lastSensorTime >= SENSOR_TIMEOUT;
+}
+
+void resetSensorState() {
+  counterState = WAITING;
+  delay(DEBOUNCE_TIME);
+}
+
+void addPerson() {
+  if (currentPeople < MAX_PEOPLE) {
+    currentPeople++;
+    totalEntries++;
+
+    Serial.print("[ENTRY] One person entered. Current: ");
+    Serial.print(currentPeople);
+    Serial.print(" | In: ");
+    Serial.print(totalEntries);
+    Serial.print(" | Out: ");
+    Serial.println(totalExits);
   }
 }
 
-void personDecrement() {
-  if (personCount > 0) {
-    personCount--;
-    totalOut++;
-    
-    Serial.print("[AUSTRITT] Person verl?sst Raum - Aktuell: ");
-    Serial.print(personCount);
-    Serial.print(" (IN: ");
-    Serial.print(totalIn);
-    Serial.print(", OUT: ");
-    Serial.print(totalOut);
-    Serial.println(")");
+void removePerson() {
+  if (currentPeople > 0) {
+    currentPeople--;
+    totalExits++;
+
+    Serial.print("[EXIT] One person left. Current: ");
+    Serial.print(currentPeople);
+    Serial.print(" | In: ");
+    Serial.print(totalEntries);
+    Serial.print(" | Out: ");
+    Serial.println(totalExits);
   } else {
-    Serial.println("[WARNUNG] Austritt ohne vorherigen Eintritt!");
+    Serial.println("[WARNING] Exit detected while room is already empty");
+  }
+}
+
+void updateDisplayIfNeeded() {
+  if (millis() - lastDisplayTime >= DISPLAY_INTERVAL) {
+    updateDisplay();
+    lastDisplayTime = millis();
   }
 }
 
 void updateDisplay() {
   lcd.setCursor(0, 0);
   lcd.print("IN:");
-  lcd.setCursor(3, 0);
-  lcd.print("   ");
-  lcd.setCursor(3, 0);
-  if (totalIn < 10) lcd.print(" ");
-  if (totalIn < 100) lcd.print(" ");
-  lcd.print(totalIn);
-  
-  lcd.setCursor(9, 0);
+  printNumberAt(3, 0, totalEntries, 3);
+
+  lcd.setCursor(8, 0);
   lcd.print("OUT:");
-  lcd.setCursor(13, 0);
-  lcd.print("   ");
-  lcd.setCursor(13, 0);
-  if (totalOut < 10) lcd.print(" ");
-  if (totalOut < 100) lcd.print(" ");
-  lcd.print(totalOut);
-  
+  printNumberAt(12, 0, totalExits, 3);
+
   lcd.setCursor(0, 1);
-  lcd.print("Personen:");
-  lcd.setCursor(9, 1);
-  lcd.print("    ");
-  lcd.setCursor(9, 1);
-  if (personCount < 10) lcd.print(" ");
-  if (personCount < 100) lcd.print(" ");
-  lcd.print(personCount);
-  
-  if (personCount >= 10) {
-    lcd.setCursor(15, 1);
+  lcd.print("People:");
+  printNumberAt(8, 1, currentPeople, 3);
+
+  lcd.setCursor(15, 1);
+  if (currentPeople >= 10) {
     lcd.print("!");
   } else {
-    lcd.setCursor(15, 1);
     lcd.print(" ");
   }
 }
 
-void resetCounters() {
-  personCount = 0;
-  totalIn = 0;
-  totalOut = 0;
-  updateDisplay();
-  Serial.println("[RESET] Alle Zahler wurden zuruckgesetzt");
+void printNumberAt(byte column, byte row, int number, byte width) {
+  lcd.setCursor(column, row);
+
+  for (byte i = 0; i < width; i++) {
+    lcd.print(" ");
+  }
+
+  lcd.setCursor(column, row);
+
+  if (number < 10 && width >= 2) lcd.print(" ");
+  if (number < 100 && width >= 3) lcd.print(" ");
+
+  lcd.print(number);
 }
 
-void processSerialCommands() {
-  if (Serial.available()) {
-    char cmd = Serial.read();
-    if (cmd == 'r' || cmd == 'R') {
-      resetCounters();
-    }
-    else if (cmd == 's' || cmd == 'S') {
-      Serial.print("Status - Aktuell: ");
-      Serial.print(personCount);
-      Serial.print(", IN: ");
-      Serial.print(totalIn);
-      Serial.print(", OUT: ");
-      Serial.println(totalOut);
-    }
+void showStartupScreen() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("People Counter");
+  lcd.setCursor(0, 1);
+  lcd.print("System Ready");
+  delay(1200);
+  lcd.clear();
+}
+
+void resetCounters() {
+  currentPeople = 0;
+  totalEntries = 0;
+  totalExits = 0;
+
+  updateDisplay();
+
+  Serial.println("[RESET] All counters have been reset");
+}
+
+void printStatus() {
+  Serial.print("[STATUS] Current: ");
+  Serial.print(currentPeople);
+  Serial.print(" | In: ");
+  Serial.print(totalEntries);
+  Serial.print(" | Out: ");
+  Serial.println(totalExits);
+}
+
+void handleSerialInput() {
+  if (!Serial.available()) {
+    return;
+  }
+
+  char command = Serial.read();
+
+  if (command == 'r' || command == 'R') {
+    resetCounters();
+  } else if (command == 's' || command == 'S') {
+    printStatus();
   }
 }
