@@ -23,7 +23,6 @@ enum CounterState {
 CounterState counterState = WAITING;
 
 bool lastEntryState = HIGH;
-bool lastExitState = HIGH;
 
 unsigned long lastSensorTime = 0;
 unsigned long lastDisplayTime = 0;
