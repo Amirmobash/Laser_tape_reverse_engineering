@@ -95,6 +95,7 @@ void readSensors() {
 
 bool isWithinSensorTime() {
   return millis() - lastSensorTime < SENSOR_TIMEOUT;
+   Serial.println("Send S to show current status");
 }
 
 bool hasSensorTimedOut() {
