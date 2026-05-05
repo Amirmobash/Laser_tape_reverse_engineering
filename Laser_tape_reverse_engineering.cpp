@@ -30,8 +30,8 @@ unsigned long lastDisplayTime = 0;
 void setup() {
   Serial.begin(9600);
 
-  pinMode(ENTRY_SENSOR_PIN, INPUT_PULLUP);
-  pinMode(EXIT_SENSOR_PIN, INPUT_PULLUP);
+  pinMode(ENTRY_SENSOR_PIN2, INPUT_PULLUP);
+  pinMode(EXIT_SENSOR_PIN2, INPUT_PULLUP);
 
   lcd.init();
   lcd.backlight();
