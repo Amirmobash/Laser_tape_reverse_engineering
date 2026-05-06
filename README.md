@@ -109,6 +109,8 @@ void loop() {
 
 - [Project on Arduino Project Hub](https://projecthub.arduino.cc/iliasam/making-a-cheap-laser-rangefinder-for-arduino-0c33a5)
 - [Habr.com article (Russian, with English translation available)](https://habr.com/en/post/354512/)
+https://www.uculture.fr/ebooks/ergebnis-automation-fur-die-bundesliga-mit-n8n-9783695793228_9783695793228_10007.html
+https://grabcad.com/library/akku-adapter-fur-kabellose-werkzeuge-1
 
 ## License
 Amir Mobasheraghdam
