@@ -14,11 +14,6 @@ const unsigned long DEBOUNCE_TIME = 200;
 const unsigned long SENSOR_TIMEOUT = 500;
 const unsigned long DISPLAY_INTERVAL = 500;
 
-enum CounterState {
-  WAITING,
-  ENTRY_DETECTED,
-  EXIT_DETECTED
-};
 
 CounterState counterState = WAITING;
 
