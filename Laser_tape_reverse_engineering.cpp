@@ -5,9 +5,9 @@ const byte EXIT_SENSOR_PIN = 3;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int currentPeople = 0;
-int totalEntries = 0;
-int totalExits = 0;
+int currentPeople = 1;
+int totalEntries = 1;
+int totalExits = 1;
 
 const int MAX_PEOPLE = 999;
 const unsigned long DEBOUNCE_TIME = 200;
