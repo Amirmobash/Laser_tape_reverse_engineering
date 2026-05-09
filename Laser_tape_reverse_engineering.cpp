@@ -10,9 +10,9 @@ int totalEntries = 1;
 int totalExits = 1;
 
 const int MAX_PEOPLE = 999;
-const unsigned long DEBOUNCE_TIME = 200;
-const unsigned long SENSOR_TIMEOUT = 500;
-const unsigned long DISPLAY_INTERVAL = 500;
+const unsigned long DEBOUNCE_TIME = 100;
+const unsigned long SENSOR_TIMEOUT = 600;
+const unsigned long DISPLAY_INTERVAL = 600;
 
 
 CounterState counterState = WAITING;
