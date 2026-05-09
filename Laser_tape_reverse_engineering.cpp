@@ -192,7 +192,7 @@ void resetCounters() {
 
   updateDisplay();
 
-  Serial.println("[RESET] All counters have been reset");
+  Serial.print("[RESET] All counters have been reset");
 }
 
 void printStatus() {
