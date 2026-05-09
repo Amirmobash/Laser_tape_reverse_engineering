@@ -5,15 +5,20 @@ const byte EXIT_SENSOR_PIN = 3;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int currentPeople = 1;
-int totalEntries = 1;
-int totalExits = 1;
+int currentPeople = 0;
+int totalEntries = 0;
+int totalExits = 0;
 
 const int MAX_PEOPLE = 999;
 const unsigned long DEBOUNCE_TIME = 100;
-const unsigned long SENSOR_TIMEOUT = 600;
-const unsigned long DISPLAY_INTERVAL = 600;
+const unsigned long SENSOR_TIMEOUT = 900;
+const unsigned long DISPLAY_INTERVAL = 100;
 
+enum CounterState {
+  WAITING,
+  ENTRY_DETECTED,
+  EXIT_DETECTED
+};
 
 CounterState counterState = WAITING;
 
@@ -192,7 +197,7 @@ void resetCounters() {
 
   updateDisplay();
 
-  Serial.print("[RESET] All counters have been reset");
+  Serial.println("[RESET] All counters have been reset");
 }
 
 void printStatus() {
