@@ -9,10 +9,10 @@ int currentPeople = 0;
 int totalEntries = 0;
 int totalExits = 0;
 
-const int MAX_PEOPLE = 999;
-const unsigned long DEBOUNCE_TIME = 100;
-const unsigned long SENSOR_TIMEOUT = 900;
-const unsigned long DISPLAY_INTERVAL = 100;
+const int MAX_PEOPLE = 9999;
+const unsigned long DEBOUNCE_TIME = 200;
+const unsigned long SENSOR_TIMEOUT = 200;
+const unsigned long DISPLAY_INTERVAL = 200;
 
 enum CounterState {
   WAITING,
