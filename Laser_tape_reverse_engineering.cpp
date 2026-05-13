@@ -1,4 +1,76 @@
 #include <LiquidCrystal_I2C.h>
+#include <LiquidCrystal_I2C.h>
+
+const byte ENTRY_SENSOR_PIN = 2;
+const byte EXIT_SENSOR_PIN = 3;
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+int people = 0;
+int inCount = 0;
+int outCount = 0;
+
+bool lastEntry = HIGH;
+bool lastExit = HIGH;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(ENTRY_SENSOR_PIN, INPUT_PULLUP);
+  pinMode(EXIT_SENSOR_PIN, INPUT_PULLUP);
+
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0, 0);
+  lcd.print("People Counter");
+  delay(1000);
+  lcd.clear();
+}
+
+void loop() {
+  bool entry = digitalRead(ENTRY_SENSOR_PIN);
+  bool exitS = digitalRead(EXIT_SENSOR_PIN);
+
+  if (lastEntry == HIGH && entry == LOW) {
+    people++;
+    inCount++;
+
+    Serial.print("IN: ");
+    Serial.println(people);
+
+    delay(300);
+  }
+
+  if (lastExit == HIGH && exitS == LOW) {
+    if (people > 0) {
+      people--;
+      outCount++;
+    }
+
+    Serial.print("OUT: ");
+    Serial.println(people);
+
+    delay(300);
+  }
+
+  lastEntry = entry;
+  lastExit = exitS;
+
+  lcd.setCursor(0, 0);
+  lcd.print("IN:");
+  lcd.print(inCount);
+
+  lcd.setCursor(8, 0);
+  lcd.print("OUT:");
+  lcd.print(outCount);
+
+  lcd.setCursor(0, 1);
+  lcd.print("People:");
+  lcd.print(people);
+
+  delay(50);
+}
 
 const byte ENTRY_SENSOR_PIN = 2;
 const byte EXIT_SENSOR_PIN = 3;
