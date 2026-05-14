@@ -107,16 +107,6 @@ void resetSensorState() {
   delay(DEBOUNCE_TIME);
 }
 
-void addPerson() {
-  if (currentPeople < MAX_PEOPLE) {
-    currentPeople++;
-    totalEntries++;
-
-    Serial.print("[ENTRY] One person entered. Current: ");
-    Serial.print(currentPeople);
-    Serial.print(" | In: ");
-    Serial.print(totalEntries);
-    Serial.print(" | Out: ");
     Serial.println(totalExits);
   }
 }
