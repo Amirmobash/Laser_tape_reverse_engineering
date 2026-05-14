@@ -1,188 +1,168 @@
 #include <LiquidCrystal_I2C.h>
 
-const byte entrySensorPin = 2;
-const byte exitSensorPin = 3;
+const byte entrySensor = 2;
+const byte exitSensor = 3;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int peopleInside = 0;
-int totalIn = 0;
-int totalOut = 0;
+int people = 0;
+int entered = 0;
+int left = 0;
 
-const int maxPeople = 9999;
-const unsigned long sensorTimeLimit = 500;
-const unsigned long debounceTime = 200;
-const unsigned long displayTime = 200;
+const int limit = 9999;
+const unsigned long waitTime = 500;
+const unsigned long pauseTime = 200;
+const unsigned long screenTime = 200;
 
-enum SensorState {
-  Waiting,
-  EntryFirst,
-  ExitFirst
+enum State {
+  Ready,
+  EntrySeen,
+  ExitSeen
 };
 
-SensorState sensorState = Waiting;
+State state = Ready;
 
-bool lastEntryState = HIGH;
-bool lastExitState = HIGH;
+bool lastEntry = HIGH;
+bool lastExit = HIGH;
 
-unsigned long firstSensorTime = 0;
+unsigned long firstSeenTime = 0;
 unsigned long lastCountTime = 0;
-unsigned long lastDisplayTime = 0;
+unsigned long lastScreenTime = 0;
 
 void setup() {
   Serial.begin(9600);
 
-  pinMode(entrySensorPin, INPUT_PULLUP);
-  pinMode(exitSensorPin, INPUT_PULLUP);
+  pinMode(entrySensor, INPUT_PULLUP);
+  pinMode(exitSensor, INPUT_PULLUP);
 
   lcd.init();
   lcd.backlight();
 
-  showStartScreen();
-  updateDisplay();
+  startScreen();
+  showNumbers();
 
-  Serial.println("People counter is ready");
-  Serial.println("Send R to reset");
-  Serial.println("Send S to show status");
+  Serial.println("People counter started");
+  Serial.println("Type R to reset");
+  Serial.println("Type S to see the numbers");
 }
 
 void loop() {
   checkSensors();
-  updateDisplayByTime();
-  checkSerial();
+  refreshScreen();
+  readCommand();
 
   delay(10);
 }
 
 void checkSensors() {
-  bool entryNow = digitalRead(entrySensorPin);
-  bool exitNow = digitalRead(exitSensorPin);
+  bool entryNow = digitalRead(entrySensor);
+  bool exitNow = digitalRead(exitSensor);
 
-  bool entryPressed = lastEntryState == HIGH && entryNow == LOW;
-  bool exitPressed = lastExitState == HIGH && exitNow == LOW;
+  bool entryTouched = lastEntry == HIGH && entryNow == LOW;
+  bool exitTouched = lastExit == HIGH && exitNow == LOW;
 
-  if (millis() - lastCountTime < debounceTime) {
-    lastEntryState = entryNow;
-    lastExitState = exitNow;
+  if (millis() - lastCountTime < pauseTime) {
+    lastEntry = entryNow;
+    lastExit = exitNow;
     return;
   }
 
-  switch (sensorState) {
-    case Waiting:
-      if (entryPressed) {
-        sensorState = EntryFirst;
-        firstSensorTime = millis();
-      } else if (exitPressed) {
-        sensorState = ExitFirst;
-        firstSensorTime = millis();
-      }
-      break;
-
-    case EntryFirst:
-      if (exitPressed && sensorIsInTime()) {
-        addPerson();
-        resetSensors();
-      } else if (sensorIsTooLate()) {
-        resetSensors();
-      }
-      break;
-
-    case ExitFirst:
-      if (entryPressed && sensorIsInTime()) {
-        removePerson();
-        resetSensors();
-      } else if (sensorIsTooLate()) {
-        resetSensors();
-      }
-      break;
+  if (state == Ready) {
+    if (entryTouched) {
+      state = EntrySeen;
+      firstSeenTime = millis();
+    } else if (exitTouched) {
+      state = ExitSeen;
+      firstSeenTime = millis();
+    }
+  } else if (state == EntrySeen) {
+    if (exitTouched && millis() - firstSeenTime <= waitTime) {
+      personEntered();
+      resetSensors();
+    } else if (millis() - firstSeenTime > waitTime) {
+      resetSensors();
+    }
+  } else if (state == ExitSeen) {
+    if (entryTouched && millis() - firstSeenTime <= waitTime) {
+      personLeft();
+      resetSensors();
+    } else if (millis() - firstSeenTime > waitTime) {
+      resetSensors();
+    }
   }
 
-  lastEntryState = entryNow;
-  lastExitState = exitNow;
-}
-
-bool sensorIsInTime() {
-  return millis() - firstSensorTime <= sensorTimeLimit;
-}
-
-bool sensorIsTooLate() {
-  return millis() - firstSensorTime > sensorTimeLimit;
+  lastEntry = entryNow;
+  lastExit = exitNow;
 }
 
 void resetSensors() {
-  sensorState = Waiting;
+  state = Ready;
   lastCountTime = millis();
 }
 
-void addPerson() {
-  if (peopleInside < maxPeople) {
-    peopleInside++;
+void personEntered() {
+  if (people < limit) {
+    people++;
+    entered++;
 
-    if (totalIn < maxPeople) {
-      totalIn++;
-    }
+    showNumbers();
 
-    updateDisplay();
-
-    Serial.print("Entry detected. People: ");
-    Serial.print(peopleInside);
-    Serial.print(" | In: ");
-    Serial.print(totalIn);
-    Serial.print(" | Out: ");
-    Serial.println(totalOut);
+    Serial.print("Someone entered. People inside: ");
+    Serial.print(people);
+    Serial.print(" | Entered: ");
+    Serial.print(entered);
+    Serial.print(" | Left: ");
+    Serial.println(left);
   }
 }
 
-void removePerson() {
-  if (peopleInside > 0) {
-    peopleInside--;
+void personLeft() {
+  if (people > 0) {
+    people--;
+    left++;
 
-    if (totalOut < maxPeople) {
-      totalOut++;
-    }
+    showNumbers();
 
-    updateDisplay();
-
-    Serial.print("Exit detected. People: ");
-    Serial.print(peopleInside);
-    Serial.print(" | In: ");
-    Serial.print(totalIn);
-    Serial.print(" | Out: ");
-    Serial.println(totalOut);
+    Serial.print("Someone left. People inside: ");
+    Serial.print(people);
+    Serial.print(" | Entered: ");
+    Serial.print(entered);
+    Serial.print(" | Left: ");
+    Serial.println(left);
   } else {
-    Serial.println("Exit detected, but the room is empty");
+    Serial.println("Someone tried to leave, but nobody is inside");
   }
 }
 
-void updateDisplayByTime() {
-  if (millis() - lastDisplayTime >= displayTime) {
-    updateDisplay();
-    lastDisplayTime = millis();
+void refreshScreen() {
+  if (millis() - lastScreenTime >= screenTime) {
+    showNumbers();
+    lastScreenTime = millis();
   }
 }
 
-void updateDisplay() {
+void showNumbers() {
   lcd.setCursor(0, 0);
   lcd.print("In:");
-  printNumber(3, 0, totalIn, 4);
+  printValue(3, 0, entered, 4);
 
   lcd.setCursor(8, 0);
   lcd.print("Out:");
-  printNumber(12, 0, totalOut, 4);
+  printValue(12, 0, left, 4);
 
   lcd.setCursor(0, 1);
   lcd.print("People:");
-  printNumber(8, 1, peopleInside, 4);
+  printValue(8, 1, people, 4);
 
   lcd.setCursor(15, 1);
-  if (peopleInside >= 10) {
+  if (people >= 10) {
     lcd.print("!");
   } else {
     lcd.print(" ");
   }
 }
 
-void printNumber(byte column, byte row, int number, byte width) {
+void printValue(byte column, byte row, int value, byte width) {
   lcd.setCursor(column, row);
 
   for (byte i = 0; i < width; i++) {
@@ -191,43 +171,43 @@ void printNumber(byte column, byte row, int number, byte width) {
 
   lcd.setCursor(column, row);
 
-  if (number < 10 && width >= 2) lcd.print(" ");
-  if (number < 100 && width >= 3) lcd.print(" ");
-  if (number < 1000 && width >= 4) lcd.print(" ");
+  if (value < 10 && width >= 2) lcd.print(" ");
+  if (value < 100 && width >= 3) lcd.print(" ");
+  if (value < 1000 && width >= 4) lcd.print(" ");
 
-  lcd.print(number);
+  lcd.print(value);
 }
 
-void showStartScreen() {
+void startScreen() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("People Counter");
   lcd.setCursor(0, 1);
-  lcd.print("System Ready");
+  lcd.print("Ready to Count");
   delay(1200);
   lcd.clear();
 }
 
 void resetCounter() {
-  peopleInside = 0;
-  totalIn = 0;
-  totalOut = 0;
+  people = 0;
+  entered = 0;
+  left = 0;
 
-  updateDisplay();
+  showNumbers();
 
-  Serial.println("Counter reset");
+  Serial.println("All numbers are reset");
 }
 
 void showStatus() {
-  Serial.print("People: ");
-  Serial.print(peopleInside);
-  Serial.print(" | In: ");
-  Serial.print(totalIn);
-  Serial.print(" | Out: ");
-  Serial.println(totalOut);
+  Serial.print("People inside: ");
+  Serial.print(people);
+  Serial.print(" | Entered: ");
+  Serial.print(entered);
+  Serial.print(" | Left: ");
+  Serial.println(left);
 }
 
-void checkSerial() {
+void readCommand() {
   if (!Serial.available()) {
     return;
   }
@@ -236,9 +216,7 @@ void checkSerial() {
 
   if (command == 'R' || command == 'r') {
     resetCounter();
-  }
-
-  if (command == 'S' || command == 's') {
+  } else if (command == 'S' || command == 's') {
     showStatus();
   }
 }
