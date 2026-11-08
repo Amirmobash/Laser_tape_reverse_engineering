@@ -1,3 +1,9 @@
+
+
+<p align="center"><img src="docs/images/laser-tape-stm32-rangefinder-reverse-engineering.svg" alt="Laser tape distance module reverse engineering and STM32 firmware" width="960" /></p>
+
+<sub>Illustrative project schematic; not an actual CAD export, hardware photograph, or independently tested result.</sub>
+
  Laser tape reverse engineering
 
 This repository contains reverse engineering results and custom firmware for cheap Chinese laser tape measures (like "X-40").
